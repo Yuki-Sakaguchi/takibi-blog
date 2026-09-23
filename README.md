@@ -3,6 +3,11 @@
 記事を書くたびに地図が広がっていく、霧の中を歩いて読むブログです。
 記事は `posts/` の Markdown で管理し、GitHub Actions でビルドして GitHub Pages に公開します。
 
+<img width="600" alt="スクリーンショット 2026-09-24 0 06 53" src="https://github.com/user-attachments/assets/6ac783c9-a265-43d3-8741-d03c74551deb" />
+
+https://yuki-sakaguchi.github.io/takibi-blog/
+
+
 ## 必要なもの
 
 - Node.js 20 以上
