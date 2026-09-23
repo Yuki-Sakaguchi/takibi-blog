@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{SITE_TITLE}}</title>
+<meta name="description" content="{{SITE_DESCRIPTION}}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#dcd6c7;--ink:#3b3a44;--paper:#fbfaf6;--line:#b3ab9a;--muted:#6b6558;--accent:#cf4f36;--flame:#e9a23b;--fog:#f6f6f2;
+  color-scheme:light;box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+:root[data-theme="dark"]{--bg:#161a33;--ink:#e8e1c8;--paper:#1f2444;--line:#3a4270;--muted:#a9a7c4;--accent:#f07a3a;--flame:#ffd27a;--fog:#0e1124;color-scheme:dark}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#161a33;--ink:#e8e1c8;--paper:#1f2444;--line:#3a4270;--muted:#a9a7c4;--accent:#f07a3a;--flame:#ffd27a;--fog:#0e1124;color-scheme:dark}
+}
+*{box-sizing:border-box}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;overflow:hidden;background:var(--fog);color:var(--ink);
+  font-family:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+canvas#world{position:fixed;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated;touch-action:none;outline:none}
+.pixel{font-family:"DotGothic16","BIZ UDPGothic",sans-serif}
+
+.hud{position:fixed;top:0;left:0;right:0;z-index:5;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;
+  padding:calc(env(safe-area-inset-top,0px) + 12px) calc(env(safe-area-inset-right,0px) + 12px) 0 calc(env(safe-area-inset-left,0px) + 12px);pointer-events:none}
+.hud > *{pointer-events:auto}
+.plate{background:var(--paper);border:3px solid var(--ink);padding:8px 12px;font-size:16px;line-height:1.2;box-shadow:3px 3px 0 var(--ink)}
+.hud nav{display:flex;gap:8px}
+.btn{font:inherit;font-family:"DotGothic16",sans-serif;font-size:15px;background:var(--paper);color:var(--ink);border:3px solid var(--ink);
+  padding:8px 12px;min-height:44px;min-width:44px;cursor:pointer;box-shadow:3px 3px 0 var(--ink)}
+.btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+.btn:focus-visible,.entry:focus-visible,.act:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--ink);color:var(--paper)}
+
+.hint{position:fixed;z-index:4;font-family:"DotGothic16",sans-serif;font-size:14px;background:var(--paper);border:3px solid var(--ink);padding:6px 10px}
+.bubble{position:fixed;z-index:4;transform:translate(-50%, calc(-100% - 10px));font:inherit;font-family:"DotGothic16",sans-serif;font-size:15px;line-height:1.2;
+  color:var(--ink);background:var(--paper);border:3px solid var(--ink);padding:6px 10px;white-space:nowrap;cursor:pointer;min-height:36px}
+.bubble::after{content:"";position:absolute;left:50%;top:100%;width:12px;height:6px;margin-left:-6px;margin-top:3px;background:var(--ink);
+  clip-path:polygon(0 0,100% 0,100% 50%,75% 50%,75% 100%,25% 100%,25% 50%,0 50%)}
+.bubble kbd{font:inherit;font-size:12px;color:var(--muted);margin-left:6px}
+.touch .bubble kbd{display:none}
+.bubble:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.bubble[hidden]{display:none}
+.hint{left:calc(env(safe-area-inset-left,0px) + 12px);bottom:calc(env(safe-area-inset-bottom,0px) + 12px)}
+.hint[hidden]{display:none}
+
+.joy{position:fixed;z-index:4;width:120px;height:120px;margin:-60px 0 0 -60px;border:3px solid var(--ink);border-radius:50%;opacity:.35;pointer-events:none;display:none}
+.joy.active{opacity:.7}
+.knob{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;background:var(--ink);border-radius:50%}
+.act{position:fixed;z-index:4;display:none;right:calc(env(safe-area-inset-right,0px) + 20px);bottom:calc(env(safe-area-inset-bottom,0px) + 32px);
+  width:88px;height:88px;border-radius:50%;border:3px solid var(--ink);background:var(--paper);color:var(--ink);
+  font-family:"DotGothic16",sans-serif;font-size:16px;box-shadow:3px 3px 0 var(--ink);opacity:.75}
+.act.on{background:var(--flame);color:#3b3a44;opacity:1}
+.touch .joy,.touch .act{display:block}
+.touch .hint{display:none}
+
+.win{position:fixed;z-index:20;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 12px);
+  width:min(680px,calc(100% - 24px));max-height:calc(100% - 96px);display:flex;flex-direction:column;
+  background:var(--paper);border:4px solid var(--ink);box-shadow:6px 6px 0 var(--ink)}
+.win.small{width:min(460px,calc(100% - 24px))}
+@media (min-width:720px){.win{top:50%;bottom:auto;transform:translate(-50%,-50%);max-height:min(760px,calc(100% - 120px))}}
+.win.full{top:calc(env(safe-area-inset-top,0px) + 10px);bottom:calc(env(safe-area-inset-bottom,0px) + 10px);
+  left:calc(env(safe-area-inset-left,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 10px);width:auto;max-height:none;transform:none}
+@media (min-width:720px){.win.full{top:calc(env(safe-area-inset-top,0px) + 24px);bottom:calc(env(safe-area-inset-bottom,0px) + 24px);left:24px;right:24px;transform:none;max-height:none}}
+.win.full .win-body{flex:1;padding:28px 20px 48px}
+.post .inner{max-width:38em;margin:0 auto}
+@media (min-width:720px){.post h1{font-size:30px}.post p{font-size:17px}}
+.win[hidden],.win-foot[hidden]{display:none}
+.win-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px 10px 18px;border-bottom:3px dashed var(--line)}
+.win-head h2{margin:0;font-size:17px;font-weight:400}
+.win-body{overflow-y:auto;padding:18px 22px 26px;-webkit-user-select:text;user-select:text;overscroll-behavior:contain}
+.win-foot{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;padding:12px 16px;border-top:3px dashed var(--line)}
+.post h1{font-family:"DotGothic16",sans-serif;font-weight:400;font-size:24px;line-height:1.4;margin:0 0 6px}
+.meta{color:var(--muted);font-size:13px;margin:0 0 18px}
+.post p,.post li{font-size:16px;line-height:1.95}
+.post p{margin:0 0 1em}
+.post h2,.post h3{font-family:"DotGothic16",sans-serif;font-weight:400;line-height:1.5;margin:1.8em 0 .6em}
+.post h2{font-size:21px;border-bottom:3px dashed var(--line);padding-bottom:4px}
+.post h3{font-size:18px}
+.post ul,.post ol{padding-left:1.4em;margin:0 0 1em}
+.post a{color:var(--accent);text-underline-offset:3px}
+.post img{max-width:100%;height:auto;display:block;margin:1em 0;image-rendering:auto}
+.post blockquote{margin:0 0 1em;padding:4px 0 4px 16px;border-left:4px solid var(--line);color:var(--muted)}
+.post code{font-family:ui-monospace,Menlo,monospace;font-size:.9em;background:var(--bg);padding:1px 4px}
+.post pre{background:var(--bg);padding:12px 14px;overflow-x:auto;margin:0 0 1em}
+.post pre code{background:none;padding:0}
+.post hr{border:0;border-top:3px dashed var(--line);margin:2em 0}
+.permalink{display:inline-block;margin-top:24px;font-size:13px;color:var(--muted)}
+.letter{display:flex;gap:16px;align-items:flex-start}
+.letter canvas{width:64px;height:64px;image-rendering:pixelated;flex:none}
+.letter p{margin:0;line-height:1.8}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.entry{width:100%;display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;cursor:pointer;
+  font:inherit;color:var(--ink);background:transparent;border:3px solid var(--line);padding:10px 12px;min-height:48px}
+.entry:hover{border-color:var(--ink)}
+.entry small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.tag{font-family:"DotGothic16",sans-serif;font-size:13px;flex:none;padding:2px 6px;border:2px solid currentColor}
+.tag.unread{color:var(--accent)}
+.tag.read{color:var(--muted)}
+.note{color:var(--muted);font-size:13px;margin:14px 0 0}
+.fade{position:fixed;inset:0;z-index:30;background:var(--fog);opacity:0;pointer-events:none;transition:opacity .45s steps(5)}
+.fade.on{opacity:1}
+@media (prefers-reduced-motion: reduce){.fade{transition:none}}
+</style>
+</head>
+<body>
+<canvas id="world" aria-label="霧の地図。旅人を歩かせて、たき火の横の手記を読めます。"></canvas>
+
+<header class="hud">
+  <div class="plate pixel">{{SITE_TITLE}}</div>
+  <nav>
+    <button class="btn" id="btnIndex" type="button">目録</button>
+    <button class="btn" id="btnPal" type="button">配色</button>
+  </nav>
+</header>
+
+<div class="hint" id="hint">矢印キー / WASD で歩く・スペースで調べる</div>
+<button class="bubble" id="bubble" type="button" hidden></button>
+<div class="joy" id="joy"><div class="knob" id="knob"></div></div>
+<button class="act" id="act" type="button">調べる</button>
+
+<section class="win full" id="winArticle" role="dialog" aria-modal="true" aria-labelledby="postTitle" hidden>
+  <div class="win-head"><h2 class="pixel">旅人の手記</h2><button class="btn" type="button" data-close>閉じる</button></div>
+  <div class="win-body post"><div class="inner"><h1 id="postTitle"></h1><p class="meta" id="postMeta"></p><div id="postBody"></div><a class="permalink" id="postLink" href="#">この手記の個別ページ</a></div></div>
+</section>
+
+<section class="win small" id="winLetter" role="dialog" aria-modal="true" aria-labelledby="letterTitle" hidden>
+  <div class="win-head"><h2 class="pixel" id="letterTitle">伝書鳩の手紙</h2></div>
+  <div class="win-body"><div class="letter"><canvas id="bird" width="8" height="8"></canvas><p id="letterText"></p></div></div>
+  <div class="win-foot"><button class="btn" type="button" id="letterLater">あとで</button><button class="btn primary" type="button" id="letterGo">すぐ向かう</button></div>
+</section>
+
+<section class="win small" id="winRest" role="dialog" aria-modal="true" aria-labelledby="restTitle" hidden>
+  <div class="win-head"><h2 class="pixel" id="restTitle">たき火で休む</h2><button class="btn" type="button" data-close>やめる</button></div>
+  <div class="win-body"><ul class="list" id="restList"></ul><p class="note" id="restNote"></p></div>
+</section>
+
+<section class="win" id="winIndex" role="dialog" aria-modal="true" aria-labelledby="indexTitle" hidden>
+  <div class="win-head"><h2 class="pixel" id="indexTitle">手記の目録</h2><button class="btn" type="button" data-close>閉じる</button></div>
+  <div class="win-body"><ul class="list" id="indexList"></ul><p class="note">選ぶとその手記のたき火まで移動します。</p></div>
+  <div class="win-foot" id="demoFoot" hidden><button class="btn" type="button" id="demoReset">最初からやり直す</button><button class="btn" type="button" id="demoAdd">手記を1冊増やす（デモ）</button></div>
+</section>
+
+<div class="fade" id="fade"></div>
+
+<script>
+(() => {
+'use strict';
+const C = 13, T = 8, FOG_R = 58, FOG_D = 6;
+const FLOOR=0, PATH=1, TREE=2, WATER=3, ROCK=4, ARCH=5, FIRE=6, BOOK=7;
+const SOLID = new Set([TREE, WATER, ROCK, ARCH, FIRE, BOOK]);
+
+const store = {
+  get(k, d){ try { const v = localStorage.getItem('takibi.' + k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem('takibi.' + k, JSON.stringify(v)); } catch(e){} },
+  clear(){ try { Object.keys(localStorage).filter(k => k.startsWith('takibi.')).forEach(k => localStorage.removeItem(k)); } catch(e){} }
+};
+
+let BASE_ARTICLES = [];
+// posts.json はビルド時に map.lock.json の順（＝地図に置かれた順）で並べて出力される
+const allArticles = () => BASE_ARTICLES.concat(store.get('extra', []));
+
+/* ---------- palettes & sprites ---------- */
+const PAL = {
+  mist:   { name:'霧の朝',   theme:'light', bg:'#dcd6c7', d:'#b3ab9a', o:'#3b3a44', p:'#fbfaf6', l:'#8e8578', r:'#cf4f36', y:'#e9a23b', g:'#5e7a5a', s:'#8e8578', w:'#7f96a8', k:'#f0dcc0', a:'#4a4856', fog:'#f6f6f2', smoke:['#8e8578','#b3ab9a'] },
+  indigo: { name:'藍と行灯', theme:'dark',  bg:'#161a33', d:'#3a4270', o:'#7a7fae', p:'#e8e1c8', l:'#3a4270', r:'#f07a3a', y:'#ffd27a', g:'#5f9c8c', s:'#7a7fae', w:'#3f6aa0', k:'#e8e1c8', a:'#e8e1c8', fog:'#0e1124', smoke:['#7a7fae','#3a4270'] }
+};
+const SPR = {
+  tree:   ['..ggg...','.gg.gg..','g.ggg.g.','.gg.gg..','g.ggg.g.','.ggggg..','...s....','..sss...'],
+  bush:   ['........','........','........','..g.g...','.ggggg..','g.g.g.g.','.ggggg..','........'],
+  wave0:  ['........','ww..www.','........','.www..ww','........','w..www..','........','..ww..ww'],
+  wave1:  ['........','.ww..www','........','w.www..w','........','.w..www.','........','w..ww..w'],
+  rock:   ['s.s.s.s.','.s.s.s.s','s.s.s.s.','.s.s.s.s','s.s.s.s.','.s.s.s.s','s.s.s.s.','.s.s.s.s'],
+  arch:   ['..aaa...','.a...a..','a.....a.','a.....a.','a.....a.','a.....a.','a.....a.','........'],
+  fire0:  ['........','...y....','..ryr...','..ryr...','.ryyyr..','.rypyr..','ssrrrss.','.ss.ss..'],
+  fire1:  ['........','....y...','...ry...','..ryr...','.ryyyr..','.ryyyr..','ssrrrss.','.ss.ss..'],
+  ember:  ['........','........','........','........','...l....','..lrl...','ssooosss','.ss.ss..'],
+  book:   ['........','........','ooooooo.','oppoppo.','ollollo.','oppoppo.','ooooooo.','..sss...'],
+  mark:   ['...r....','...r....','........','........','........','........','........','........'],
+  spark:  ['.......y','......y.','........','........','........','........','........','........'],
+  pl0:    ['..rrr...','.rrrrr..','.rkkkr..','.rokor..','..rrr...','.rrrrr..','..o.o...','..o.o...'],
+  pl1:    ['..rrr...','.rrrrr..','.rkkkr..','.rokor..','..rrr...','.rrrrr..','..o.o...','....o...'],
+  pl2:    ['..rrr...','.rrrrr..','.rkkkr..','.rokor..','..rrr...','.rrrrr..','..o.o...','..o.....'],
+  bird:   ['........','..oo....','.oppo...','oppppooo','.opppo..','..oo....','...r....','........']
+};
+function makeSprite(rows, pal, flip){
+  const c = document.createElement('canvas'); c.width = 8; c.height = 8;
+  const x = c.getContext('2d');
+  rows.forEach((r, y) => { for (let i = 0; i < 8; i++){ const ch = r[i]; if (ch && ch !== '.'){ x.fillStyle = pal[ch]; x.fillRect(flip ? 7 - i : i, y, 1, 1); } } });
+  return c;
+}
+function makeFog(pal, parity){
+  const M = 2 * (FOG_R + FOG_D) + 2, c = document.createElement('canvas'); c.width = c.height = M;
+  const x = c.getContext('2d'), img = x.createImageData(M, M), h = pal.fog;
+  const rr = parseInt(h.slice(1,3),16), gg = parseInt(h.slice(3,5),16), bb = parseInt(h.slice(5,7),16);
+  for (let y = 0; y < M; y++) for (let i = 0; i < M; i++){
+    const d = Math.hypot(i - M/2, y - M/2);
+    if (d > FOG_R + FOG_D || (d > FOG_R && (i + y + parity) % 2 === 0)){
+      const o = (y * M + i) * 4; img.data[o] = rr; img.data[o+1] = gg; img.data[o+2] = bb; img.data[o+3] = 255;
+    }
+  }
+  x.putImageData(img, 0, 0); return c;
+}
+let palKey = PAL[store.get('pal', 'mist')] ? store.get('pal', 'mist') : 'mist';
+let pal, sprites, fogMasks;
+function applyPalette(){
+  pal = PAL[palKey];
+  sprites = {};
+  for (const k in SPR) sprites[k] = makeSprite(SPR[k], pal, false);
+  ['pl0','pl1','pl2'].forEach(k => { sprites[k + 'f'] = makeSprite(SPR[k], pal, true); });
+  fogMasks = [makeFog(pal, 0), makeFog(pal, 1)];
+  document.documentElement.dataset.theme = pal.theme;
+  const bird = document.getElementById('bird').getContext('2d');
+  bird.clearRect(0, 0, 8, 8); bird.drawImage(sprites.bird, 0, 0);
+}
+
+/* ---------- world generation ---------- */
+function hash(str){ let h = 2166136261; for (let i = 0; i < str.length; i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function rng(seed){ let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+let world;
+function build(arts){
+  const cells = [], occ = new Set(); let gx = 0, gy = 0;
+  arts.forEach((a, i) => {
+    if (i > 0){
+      const r = rng(hash(a.slug));
+      const opts = [[1,0],[1,0],[0,-1],[0,1]];
+      for (let j = opts.length - 1; j > 0; j--){ const k = Math.floor(r() * (j + 1)); [opts[j], opts[k]] = [opts[k], opts[j]]; }
+      opts.push([-1,0]);
+      let placed = false;
+      for (const [dx, dy] of opts){ if (!occ.has((gx+dx)+','+(gy+dy))){ gx += dx; gy += dy; placed = true; break; } }
+      if (!placed){ do { gx++; } while (occ.has(gx+','+gy)); }
+    }
+    occ.add(gx+','+gy); cells.push({ gx, gy, a });
+  });
+  const xs = cells.map(c => c.gx), ys = cells.map(c => c.gy);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const ox = (1 - minX) * C, oy = (1 - minY) * C;
+  const W = (maxX - minX + 3) * C, H = (maxY - minY + 3) * C;
+  const tiles = new Uint8Array(W * H).fill(TREE);
+  const get = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? TREE : tiles[y * W + x];
+  const set = (x, y, v) => { if (x >= 0 && y >= 0 && x < W && y < H) tiles[y * W + x] = v; };
+
+  const chunks = cells.map((c, i) => {
+    const r = rng(hash(c.a.slug) ^ 0x9e3779b9);
+    const x0 = ox + c.gx * C, y0 = oy + c.gy * C, cx = x0 + 6, cy = y0 + 6;
+    for (let y = 0; y < C; y++) for (let x = 0; x < C; x++){
+      const edge = x === 0 || y === 0 || x === C - 1 || y === C - 1;
+      set(x0 + x, y0 + y, edge && r() < 0.8 ? TREE : FLOOR);
+    }
+    const inCamp = (x, y) => x >= cx - 3 && x <= cx + 4 && y >= cy - 3 && y <= cy + 3;
+    const nf = 2 + Math.floor(r() * 3);
+    for (let f = 0; f < nf; f++){
+      const type = [TREE, TREE, WATER, ROCK][Math.floor(r() * 4)];
+      const fx = x0 + 2 + r() * (C - 4), fy = y0 + 2 + r() * (C - 4), rx = 1.2 + r() * 2.2, ry = 1 + r() * 1.8;
+      for (let y = Math.floor(fy - ry); y <= fy + ry; y++) for (let x = Math.floor(fx - rx); x <= fx + rx; x++){
+        if (x <= x0 || y <= y0 || x >= x0 + C - 1 || y >= y0 + C - 1 || inCamp(x, y)) continue;
+        if (((x + .5 - fx) / rx) ** 2 + ((y + .5 - fy) / ry) ** 2 < 1 && (type !== TREE || r() < 0.85)) set(x, y, type);
+      }
+    }
+    if (r() < 0.45){
+      for (let t = 0; t < 10; t++){
+        const x = x0 + 1 + Math.floor(r() * (C - 2)), y = y0 + 1 + Math.floor(r() * (C - 2));
+        if (!inCamp(x, y) && get(x, y) === FLOOR){ set(x, y, ARCH); break; }
+      }
+    }
+    // 消した記事（ghost）の区画は地形だけ残し、たき火と手記は置かない
+    if (!c.a.ghost){ set(cx, cy, FIRE); set(cx + 3, cy, BOOK); }
+    return { a: c.a, i, cx, cy, sx: cx - 2, sy: cy + 1 };
+  });
+  const carve = (x, y) => { const t = get(x, y); if (t !== FIRE && t !== BOOK) set(x, y, PATH); };
+  for (let i = 1; i < chunks.length; i++){
+    const p = chunks[i - 1], q = chunks[i];
+    const ax = p.cx - 1, ay = p.cy + 2, bx = q.cx - 1, by = q.cy + 2;
+    for (let x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) carve(x, ay);
+    for (let y = Math.min(ay, by); y <= Math.max(ay, by); y++) carve(bx, y);
+  }
+  world = { W, H, tiles, chunks, posts: chunks.filter(c => !c.a.ghost), ox, oy, get };
+}
+
+/* ---------- state ---------- */
+let arts = [], latest = null;
+let read = new Set(store.get('read', []));
+let fresh = new Set(store.get('fresh', []));
+const player = { x: 0, y: 0, face: 1, moving: false, anim: 0 };
+const isLit = ch => !read.has(ch.a.slug) || ch === latest;
+const hasSmoke = ch => fresh.has(ch.a.slug) && !read.has(ch.a.slug);
+
+function spawnAt(ch){ player.x = ch.sx * T + 4; player.y = ch.sy * T + 4; savePos(); }
+function savePos(){ store.set('pos', { x: player.x - world.ox * T, y: player.y - world.oy * T }); }
+
+function boot(){
+  arts = allArticles(); build(arts); latest = world.posts[world.posts.length - 1];
+  const slugs = arts.filter(a => !a.ghost).map(a => a.slug);
+  const known = store.get('known', null);
+  const newOnes = known ? slugs.filter(s => !known.includes(s) && !read.has(s)) : [];
+  newOnes.forEach(s => fresh.add(s));
+  fresh = new Set([...fresh].filter(s => slugs.includes(s) && !read.has(s)));
+  store.set('fresh', [...fresh]); store.set('known', slugs);
+  const m = location.hash.match(/^#\/post\/(.+)$/);
+  const deep = m && world.posts.find(c => c.a.slug === decodeURIComponent(m[1]));
+  const saved = store.get('pos', null);
+  if (deep){ spawnAt(deep); openArticle(deep); }
+  else if (saved && known){
+    player.x = saved.x + world.ox * T; player.y = saved.y + world.oy * T;
+    if (collide(player.x, player.y)) spawnAt(latest);
+  } else spawnAt(latest);
+  if (!deep && newOnes.length) showLetter(newOnes.length);
+}
+
+/* ---------- movement ---------- */
+const tileAt = (px, py) => world.get(Math.floor(px / T), Math.floor(py / T));
+function collide(x, y){
+  return [[x - 3, y], [x + 2, y], [x - 3, y + 3], [x + 2, y + 3]].some(([a, b]) => SOLID.has(tileAt(a, b)));
+}
+function move(dx, dy){
+  if (dx && !collide(player.x + dx, player.y)) player.x += dx;
+  if (dy && !collide(player.x, player.y + dy)) player.y += dy;
+}
+function nearby(){
+  let best = null, bd = 14;
+  for (const ch of world.posts){
+    const db = Math.hypot(ch.cx * T + 3 * T + 4 - player.x, ch.cy * T + 4 - player.y);
+    if (db < bd){ bd = db; best = { kind: 'book', ch }; }
+  }
+  if (best) return best;
+  bd = 14;
+  for (const ch of world.posts){
+    const df = Math.hypot(ch.cx * T + 4 - player.x, ch.cy * T + 4 - player.y);
+    if (df < bd){ bd = df; best = { kind: 'fire', ch }; }
+  }
+  return best;
+}
+
+/* ---------- input ---------- */
+const keys = new Set();
+const joy = { id: null, x0: 0, y0: 0, vx: 0, vy: 0 };
+const $ = id => document.getElementById(id);
+const cv = $('world'), ctx = cv.getContext('2d');
+const joyEl = $('joy'), knob = $('knob'), actBtn = $('act'), bubble = $('bubble'), hintEl = $('hint');
+let touchMode = matchMedia('(pointer: coarse)').matches;
+function setTouch(on){ touchMode = on; document.documentElement.classList.toggle('touch', on); if (on) parkJoy(); }
+function parkJoy(){ joyEl.classList.remove('active'); joyEl.style.left = 'calc(env(safe-area-inset-left, 0px) + 96px)'; joyEl.style.top = 'calc(100% - env(safe-area-inset-bottom, 0px) - 96px)'; knob.style.transform = ''; }
+
+const anyOpen = () => !!document.querySelector('.win:not([hidden])');
+addEventListener('keydown', e => {
+  if (e.key === 'Escape'){ closeTop(); return; }
+  if (anyOpen()) return;
+  const k = e.key.toLowerCase();
+  if (['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'].includes(k)){ keys.add(k); e.preventDefault(); if (touchMode) setTouch(false); }
+  if ((k === ' ' || k === 'enter' || k === 'z') && !e.repeat){ e.preventDefault(); act(); }
+});
+addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+addEventListener('blur', () => keys.clear());
+
+cv.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' || anyOpen()) return;
+  if (!touchMode) setTouch(true);
+  if (e.clientX > innerWidth * 0.65) return;
+  joy.id = e.pointerId; joy.x0 = e.clientX; joy.y0 = e.clientY; joy.vx = joy.vy = 0;
+  cv.setPointerCapture(e.pointerId);
+  joyEl.style.left = e.clientX + 'px'; joyEl.style.top = e.clientY + 'px'; joyEl.classList.add('active');
+});
+cv.addEventListener('pointermove', e => {
+  if (e.pointerId !== joy.id) return;
+  let dx = e.clientX - joy.x0, dy = e.clientY - joy.y0; const d = Math.hypot(dx, dy), R = 44;
+  if (d > R){ dx = dx / d * R; dy = dy / d * R; }
+  knob.style.transform = `translate(${dx}px, ${dy}px)`;
+  joy.vx = d < 8 ? 0 : dx / R; joy.vy = d < 8 ? 0 : dy / R;
+});
+const endJoy = e => { if (e.pointerId !== joy.id) return; joy.id = null; joy.vx = joy.vy = 0; parkJoy(); };
+cv.addEventListener('pointerup', endJoy); cv.addEventListener('pointercancel', endJoy);
+actBtn.addEventListener('click', () => act());
+bubble.addEventListener('click', () => act());
+
+function inputVec(){
+  if (anyOpen()) return { x: 0, y: 0 };
+  let x = (keys.has('arrowright') || keys.has('d') ? 1 : 0) - (keys.has('arrowleft') || keys.has('a') ? 1 : 0);
+  let y = (keys.has('arrowdown') || keys.has('s') ? 1 : 0) - (keys.has('arrowup') || keys.has('w') ? 1 : 0);
+  x += joy.vx; y += joy.vy;
+  const l = Math.hypot(x, y); if (l > 1){ x /= l; y /= l; }
+  return { x, y };
+}
+
+/* ---------- windows ---------- */
+const winA = $('winArticle'), winL = $('winLetter'), winR = $('winRest'), winI = $('winIndex');
+let lastFocus = null;
+function openWin(w){ lastFocus = document.activeElement; w.hidden = false; const f = w.querySelector('button'); if (f) f.focus(); }
+function closeWin(w){
+  if (w.hidden) return; w.hidden = true;
+  if (w === winA){ try { history.replaceState(null, '', location.pathname + location.search); } catch(e){} }
+  if (lastFocus && lastFocus.focus) lastFocus.focus(); else cv.focus();
+}
+function closeTop(){ [winA, winR, winI, winL].forEach(closeWin); }
+document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => closeWin(b.closest('.win'))));
+
+function openArticle(ch){
+  const a = ch.a;
+  $('postTitle').textContent = a.title;
+  $('postMeta').textContent = a.date.replace(/-/g, '.') + '　' + a.cat;
+  const body = $('postBody'); body.textContent = '';
+  body.innerHTML = a.html;
+  $('postLink').href = a.demo ? '#' : './posts/' + encodeURIComponent(a.slug) + '/';
+  $('postLink').hidden = !!a.demo;
+  read.add(a.slug); store.set('read', [...read]);
+  fresh.delete(a.slug); store.set('fresh', [...fresh]);
+  try { history.replaceState(null, '', '#/post/' + encodeURIComponent(a.slug)); } catch(e){}
+  openWin(winA);
+  winA.querySelector('.win-body').scrollTop = 0;
+}
+function travel(ch, then){
+  const fade = $('fade'); fade.classList.add('on');
+  setTimeout(() => { spawnAt(ch); fade.classList.remove('on'); if (then) then(); }, 480);
+}
+function showLetter(n){
+  $('letterText').textContent = `伝書鳩が手紙を運んできた。「新しい手記が ${n} 冊見つかったよ。のろしの上がっているたき火に置いてある」`;
+  openWin(winL);
+}
+$('letterLater').addEventListener('click', () => closeWin(winL));
+$('letterGo').addEventListener('click', () => {
+  closeWin(winL);
+  const target = world.posts.find(hasSmoke) || latest;
+  travel(target);
+});
+
+function entryButton(ch, label, sub, tag){
+  const li = document.createElement('li'), b = document.createElement('button');
+  b.type = 'button'; b.className = 'entry';
+  const t = document.createElement('span'); t.textContent = label;
+  const s = document.createElement('small'); s.textContent = sub; t.appendChild(s);
+  b.appendChild(t);
+  if (tag){ const g = document.createElement('span'); g.className = 'tag ' + tag[1]; g.textContent = tag[0]; b.appendChild(g); }
+  li.appendChild(b); return { li, b };
+}
+function showRest(here){
+  const list = $('restList'); list.textContent = '';
+  const dests = world.posts.filter(c => c !== here && !read.has(c.a.slug))
+    .sort((p, q) => (hasSmoke(q) - hasSmoke(p)) || (q.i - p.i));
+  if (latest !== here && !dests.includes(latest)) dests.push(latest);
+  dests.forEach(c => {
+    const sub = hasSmoke(c) ? 'のろしの上がるたき火' : c === latest ? 'いちばん新しいたき火' : '灯っているたき火';
+    const { li, b } = entryButton(c, c.a.title, sub, hasSmoke(c) ? ['新着', 'unread'] : null);
+    b.addEventListener('click', () => { closeWin(winR); travel(c); });
+    list.appendChild(li);
+  });
+  $('restNote').textContent = dests.length ? '行き先を選ぶと、そのたき火の横で目覚めます。' : 'ほかに灯っているたき火はないようだ。ここでひと休みしよう。';
+  openWin(winR);
+}
+function showIndex(){
+  const list = $('indexList'); list.textContent = '';
+  [...world.posts].reverse().forEach(c => {
+    const r = read.has(c.a.slug);
+    const { li, b } = entryButton(c, c.a.title, c.a.date.replace(/-/g, '.') + '　' + c.a.cat, r ? ['栞', 'read'] : ['未読', 'unread']);
+    b.addEventListener('click', () => { closeWin(winI); travel(c, () => openArticle(c)); });
+    list.appendChild(li);
+  });
+  openWin(winI);
+}
+$('btnIndex').addEventListener('click', showIndex);
+$('btnPal').addEventListener('click', () => { palKey = palKey === 'mist' ? 'indigo' : 'mist'; store.set('pal', palKey); applyPalette(); });
+$('demoAdd').addEventListener('click', () => {
+  const extra = store.get('extra', []); const n = extra.length + 1;
+  const d = new Date(), date = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  extra.push({ slug: 'demo-' + n + '-' + Date.now().toString(36), date, cat: 'デモ', title: `新しい手記（デモ ${n}）`, demo: true,
+    html: '<p>デモ用に追加した手記です。道の先に新しい区画が継ぎ足され、ここにたき火が灯りました。</p><p>この手記を読むと、たき火ののろしが消えます。</p>' });
+  store.set('extra', extra); savePos(); closeWin(winI); boot();
+});
+$('demoReset').addEventListener('click', () => {
+  store.clear(); read = new Set(); fresh = new Set(); palKey = 'mist'; applyPalette(); closeWin(winI); boot();
+});
+
+function act(){
+  if (anyOpen()) return;
+  const n = nearby(); if (!n) return;
+  if (n.kind === 'book') openArticle(n.ch); else showRest(n.ch);
+}
+
+/* ---------- render ---------- */
+let scale = 3, dpr = 1;
+function resize(){
+  dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  const tiles = Math.min(w, h) < 600 ? 15 : 21;
+  scale = Math.max(2, Math.round(Math.min(cv.width, cv.height) / (T * tiles)));
+  ctx.imageSmoothingEnabled = false;
+  placeBubble();
+}
+function placeBubble(){
+  // 旅人は常に画面中央に描かれるので、頭の真上に吹き出しを置く
+  const headTop = Math.floor(cv.height / 2) - 4 * scale;
+  bubble.style.left = ((Math.floor(cv.width / 2) - 0.5 * scale) / dpr) + 'px';
+  bubble.style.top = (headTop / dpr) + 'px';
+}
+addEventListener('resize', resize);
+
+function draw(time){
+  const s = scale, cw = cv.width, chh = cv.height, TS = T * s;
+  const px = Math.round(player.x), py = Math.round(player.y);
+  const camX = px * s - Math.floor(cw / 2), camY = py * s - Math.floor(chh / 2);
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, cw, chh);
+  const tx0 = Math.floor(camX / TS) - 1, ty0 = Math.floor(camY / TS) - 1;
+  const tx1 = tx0 + Math.ceil(cw / TS) + 2, ty1 = ty0 + Math.ceil(chh / TS) + 2;
+  const lit = world.posts.filter(isLit);
+  const ff = Math.floor(time * 4) % 2, wf = Math.floor(time * 1.2) % 2, blink = Math.floor(time * 1.6) % 2;
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++){
+    const t = world.get(tx, ty), X = tx * TS - camX, Y = ty * TS - camY;
+    if (t === FLOOR || t === FIRE || t === BOOK){
+      if (lit.some(f => (tx - f.cx) ** 2 + (ty - f.cy) ** 2 < 12)){ ctx.fillStyle = pal.y; ctx.fillRect(X + 4 * s, Y + 4 * s, s, s); }
+    } else if (t === PATH){
+      ctx.fillStyle = pal.d;
+      ctx.fillRect(X + s, Y + 2 * s, s, s); ctx.fillRect(X + 5 * s, Y + 2 * s, s, s);
+      ctx.fillRect(X + 3 * s, Y + 6 * s, s, s); ctx.fillRect(X + 7 * s, Y + 6 * s, s, s);
+    } else if (t === TREE) ctx.drawImage((((tx * 73856093) ^ (ty * 19349663)) >>> 0) % 5 === 0 ? sprites.bush : sprites.tree, X, Y, TS, TS);
+    else if (t === WATER) ctx.drawImage(wf ? sprites.wave1 : sprites.wave0, X, Y, TS, TS);
+    else if (t === ROCK) ctx.drawImage(sprites.rock, X, Y, TS, TS);
+    else if (t === ARCH) ctx.drawImage(sprites.arch, X, Y, TS, TS);
+  }
+  for (const ch of world.posts){
+    if (ch.cx < tx0 - 4 || ch.cx > tx1 + 4 || ch.cy < ty0 - 1 || ch.cy > ty1 + 1) continue;
+    const FX = ch.cx * TS - camX, FY = ch.cy * TS - camY, BX = FX + 3 * TS;
+    ctx.drawImage(isLit(ch) ? (ff ? sprites.fire1 : sprites.fire0) : sprites.ember, FX, FY, TS, TS);
+    ctx.drawImage(sprites.book, BX, FY, TS, TS);
+    if (read.has(ch.a.slug)) ctx.drawImage(sprites.mark, BX, FY, TS, TS);
+    else if (blink) ctx.drawImage(sprites.spark, BX, FY, TS, TS);
+  }
+  const step = player.moving ? ['pl0','pl1','pl0','pl2'][Math.floor(player.anim * 8) % 4] : 'pl0';
+  const ps = sprites[step + (player.face < 0 ? 'f' : '')];
+  // 反転時は1px左へ補正して、左右どちらを向いても同じ位置に描く
+  const flipFix = player.face < 0 ? 1 : 0;
+  ctx.drawImage(ps, (px - 4 - flipFix) * s - camX, (py - 4) * s - camY, TS, TS);
+
+  const M = 2 * (FOG_R + FOG_D) + 2, wx0 = px - M / 2, wy0 = py - M / 2;
+  const mx = wx0 * s - camX, my = wy0 * s - camY, mw = M * s;
+  ctx.drawImage(fogMasks[((wx0 + wy0) % 2 + 2) % 2], mx, my, mw, mw);
+  ctx.fillStyle = pal.fog;
+  ctx.fillRect(0, 0, cw, Math.max(0, my)); ctx.fillRect(0, my + mw, cw, Math.max(0, chh - my - mw));
+  ctx.fillRect(0, my, Math.max(0, mx), mw); ctx.fillRect(mx + mw, my, Math.max(0, cw - mx - mw), mw);
+
+  for (const ch of world.posts){
+    if (!hasSmoke(ch)) continue;
+    const fx = ch.cx * T + 4, fy = ch.cy * T + 2;
+    for (let k = 0; k < 30; k++){
+      const prog = (time * 14 + k * 7) % 120;
+      const yy = fy - prog, xx = fx + Math.sin(yy / 9 + time * 0.8) * (1.5 + prog / 28);
+      const size = prog < 24 ? 1 : prog < 70 ? 2 : 3;
+      ctx.fillStyle = pal.smoke[k % 2];
+      ctx.fillRect(Math.round(xx) * s - camX, Math.round(yy) * s - camY, size * s, size * s);
+    }
+    const sx = fx * s - camX, sy = (fy - 40) * s - camY;
+    const m = 36 * dpr, top = 80 * dpr, bot = (touchMode ? 150 : 70) * dpr;
+    if (sx < 0 || sx > cw || sy < top || sy > chh - bot){
+      const ex = Math.min(Math.max(sx, m), cw - m), ey = Math.min(Math.max(sy, top), chh - bot);
+      const u = s * 2;
+      ctx.fillStyle = pal.smoke[0];
+      ctx.fillRect(ex - u, ey - u * 5, u * 2, u * 2); ctx.fillRect(ex, ey - u * 3, u * 2, u * 2); ctx.fillRect(ex - u, ey - u, u * 2, u * 2);
+      ctx.fillStyle = pal.y; ctx.fillRect(ex - u / 2, ey + u * 1.5, u, u);
+    }
+  }
+}
+
+/* ---------- loop ---------- */
+let last = performance.now(), saveT = 0, lastLabel = '';
+function frame(now){
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const v = inputVec();
+  if (v.x || v.y){
+    player.moving = true; player.anim += dt;
+    if (Math.abs(v.x) > 0.1) player.face = v.x < 0 ? -1 : 1;
+    const sp = 36 * dt; move(v.x * sp, v.y * sp);
+    saveT += dt; if (saveT > 1){ saveT = 0; savePos(); }
+    if (!hintEl.hidden) hintEl.hidden = true;
+  } else if (player.moving){ player.moving = false; savePos(); }
+  const n = anyOpen() ? null : nearby();
+  const label = n ? (n.kind === 'book' ? '手記を読む' : 'たき火で休む') : '';
+  if (label !== lastLabel){
+    lastLabel = label;
+    actBtn.textContent = n ? (n.kind === 'book' ? '読む' : '休む') : '調べる';
+    actBtn.classList.toggle('on', !!n);
+    bubble.hidden = !n; bubble.textContent = label;
+    if (n){ const k = document.createElement('kbd'); k.textContent = 'スペース'; bubble.appendChild(k); }
+  }
+  draw(now / 1000);
+  requestAnimationFrame(frame);
+}
+
+// ?demo をつけて開くと、目録にデモ用のボタンが出る
+const demoMode = new URLSearchParams(location.search).has('demo');
+$('demoFoot').hidden = !demoMode;
+if (!demoMode) store.set('extra', []);
+
+applyPalette(); setTouch(touchMode); resize();
+fetch('./posts.json', { cache: 'no-cache' })
+  .then(r => r.json())
+  .then(list => { BASE_ARTICLES = list; if (!allArticles().some(a => !a.ghost)) throw new Error('no posts'); boot(); requestAnimationFrame(frame); })
+  .catch(err => {
+    console.error(err);
+    document.querySelector('.plate').textContent = '手記を読み込めませんでした';
+  });
+})();
+</script>
+</body>
+</html>
